@@ -6,8 +6,11 @@
 
 import type { Router } from 'express';
 import { ConverterController } from './controllers/converter.controller.js';
-import { YoutubeConverterImpl } from './services/youtubeConverterImpl.js';
+import { YoutubeConverterImpl } from './services/youtubeConverterImpl.service.js';
 import { YtdlpService } from './services/ytdlp.service.js';
+import { RedisConvertService } from './services/redisConvert.service.js';
+import { env } from '../config/env.js';
+import { ConverterFactory } from './converterFactory.js';
 
 /**
  * Creates and registers converter routes
@@ -17,67 +20,16 @@ import { YtdlpService } from './services/ytdlp.service.js';
  * @returns Configured router
  */
 export function createConverterRoutes(
-  router: Router,
-  options: { logger?: Console } = {}
+    router: Router,
+    options: { logger?: Console } = {}
 ): Router {
-  const logger = options.logger || console;
+    const logger = options.logger || console;
+    const controller = ConverterFactory.createConverterController(logger);
 
-  // Initialize services
-  const ytdlpService = new YtdlpService();
-  const converterService = new YoutubeConverterImpl(ytdlpService, logger);
-  const controller = new ConverterController(converterService, logger);
+    router.get(`${env.API_PREFIX}/converter/formats`, controller.getFormats.bind(controller));
+    router.get(`${env.API_PREFIX}/converter/download/:formatId`, controller.getDownloadUrl.bind(controller));
 
-  // Bind 'this' context for controller methods
-  const getFormats = controller.getFormats.bind(controller);
-  const getDownloadUrl = controller.getDownloadUrl.bind(controller);
-
-  /**
-   * GET /api/converter/formats
-   * 
-   * Retrieve available video formats for a YouTube URL
-   * 
-   * Query Parameters:
-   *   - url (required): YouTube video URL
-   * 
-   * Response (200):
-   *   {
-   *     "videoId": "string",
-   *     "formats": [ ... ],
-   *     "timestamp": "ISO8601 date string"
-   *   }
-   * 
-   * Error Responses:
-   *   - 400: Missing or invalid parameters
-   *   - 500: Server error
-   */
-  router.get('/api/converter/formats', getFormats);
-
-  /**
-   * GET /api/converter/download/:formatId
-   * 
-   * Retrieve direct download URL for a specific video format
-   * 
-   * Path Parameters:
-   *   - formatId (required): Format ID from getFormats endpoint
-   * 
-   * Query Parameters:
-   *   - url (required): YouTube video URL
-   * 
-   * Response (200):
-   *   {
-   *     "videoId": "string",
-   *     "formatId": "string",
-   *     "downloadUrl": "string",
-   *     "timestamp": "ISO8601 date string"
-   *   }
-   * 
-   * Error Responses:
-   *   - 400: Missing or invalid parameters
-   *   - 500: Server error
-   */
-  router.get('/api/converter/download/:formatId', getDownloadUrl);
-
-  logger.info('[ConverterRoutes] Converter routes initialized');
-
-  return router;
+    logger.info('[ConverterRoutes] Converter routes initialized');
+    return router;
 }
+
