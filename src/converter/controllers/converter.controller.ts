@@ -5,13 +5,13 @@
  */
 
 import type { Request, Response } from 'express';
-import type { ConverterInterface } from '../interfaces/converter.interface.js';
+import type { ConverterService } from '../interfaces/converter.interface.js';
 
 /**
 * Controller class for handling converter-related HTTP requests
 */
 export class ConverterController {
-    private converterService: ConverterInterface;
+    private converterService: ConverterService;
     private logger: Console;
 
     /**
@@ -20,7 +20,7 @@ export class ConverterController {
     * @param converterService - The converter service instance
     * @param logger - Logger instance for debugging
     */
-    constructor(converterService: ConverterInterface, logger: Console = console) {
+    constructor(converterService: ConverterService, logger: Console = console) {
         this.converterService = converterService;
          this.logger = logger;
     }

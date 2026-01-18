@@ -5,10 +5,6 @@
  */
 
 import type { Router } from 'express';
-import { ConverterController } from './controllers/converter.controller.js';
-import { YoutubeConverterImpl } from './services/youtubeConverterImpl.service.js';
-import { YtdlpService } from './services/ytdlp.service.js';
-import { RedisConvertService } from './services/redisConvert.service.js';
 import { env } from '../config/env.js';
 import { ConverterFactory } from './converterFactory.js';
 

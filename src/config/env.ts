@@ -83,7 +83,7 @@ export class EnvProcessor {
             API_PREFIX: this.API_PREFIX,
             REDIS_HOST: this.REDIS_HOST,
             REDIS_PORT: this.REDIS_PORT,
-            CACHE_TTL: this.CACHE_TTL,
+            DEFAULT_CACHE_TTL: this.DEFAULT_CACHE_TTL,
         };
     }
 }

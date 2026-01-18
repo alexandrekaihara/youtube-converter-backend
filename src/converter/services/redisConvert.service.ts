@@ -6,6 +6,8 @@
 
 import { createClient, type RedisClientType } from 'redis';
 import type { CacheService } from '../interfaces/cache.interface.js';
+import { env } from '../../config/env.js';
+
 
 export class RedisConvertService implements CacheService {
     private client: RedisClientType;
@@ -32,17 +34,16 @@ export class RedisConvertService implements CacheService {
         } = {},
         logger: Console = console
     ) {
-        this.host = options.host || 'localhost';
+        this.host = (env.isDevelopment() ? 'localhost' : options.host) as string;
         this.port = options.port || 6379;
         this.password = options.password as string;
         this.logger = logger;
 
         // Create Redis client
         this.client = createClient({
-            host: this.host,
-            port: this.port,
-            password: this.password,
             socket: {
+                host: this.host,
+                port: this.port,
                 reconnectStrategy: (retries) => {
                     if (retries > 10) {
                         this.logger.error(
@@ -53,6 +54,7 @@ export class RedisConvertService implements CacheService {
                     return retries * 100;
                 },
             },
+            ...(this.password && { password: this.password }),
         });
 
         this.setupEventHandlers();
