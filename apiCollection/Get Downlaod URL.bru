@@ -1,0 +1,20 @@
+meta {
+  name: Get Downlaod URL
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://localhost:3000/api/converter/download/140?url=https://www.youtube.com/watch?v=SLsGc-3dQa8
+  body: none
+  auth: inherit
+}
+
+params:query {
+  url: https://www.youtube.com/watch?v=SLsGc-3dQa8
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

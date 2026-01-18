@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "name": "Converter",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ],
+  "size": 0.0005855560302734375,
+  "filesCount": 2
+}
