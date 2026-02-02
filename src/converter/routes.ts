@@ -23,7 +23,7 @@ export function createConverterRoutes(
     const controller = ConverterFactory.createConverterController(logger);
 
     router.get(`${env.API_PREFIX}/converter/formats`, controller.getFormats.bind(controller));
-    router.get(`${env.API_PREFIX}/converter/download/:formatId`, controller.getDownloadUrl.bind(controller));
+    router.get(`${env.API_PREFIX}/converter/download`, controller.getDownloadUrl.bind(controller));
 
     logger.info('[ConverterRoutes] Converter routes initialized');
     return router;

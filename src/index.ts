@@ -5,6 +5,7 @@
  */
 
 import express from 'express';
+import cors from 'cors';
 import { env } from './config/env.js';
 import { createConverterRoutes } from './converter/routes.js';
 
@@ -14,6 +15,7 @@ const app = express();
 const PORT = env.PORT;
 
 // Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

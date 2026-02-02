@@ -7,7 +7,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { VideoFormat } from '../interfaces/converter.interface';
+import type { DownloadURL, DownloadURLType, FileFormats, FormatOptions } from '../interfaces/converter.interface';
 import { env } from '../../config/env.js';
 import { ConverterUtils } from '../utils/ConverterUtils.js';
 
@@ -34,10 +34,10 @@ export class YtdlpService {
    * Executes yt-dlp -F command to get available formats
    * 
    * @param url - YouTube video URL
-   * @returns Promise resolving to array of video formats
+   * @returns Promise resolving to format options with video formats, audio formats, and supported types
    * @throws Error if command execution fails or parsing fails
    */
-    async getFormatOptions(url: string): Promise<VideoFormat[]> {
+    async getFormatOptions(url: string): Promise<FormatOptions> {
         try {
             this.logger.info(`[YtdlpService] Fetching formats for URL: ${url}`);
 
@@ -46,10 +46,11 @@ export class YtdlpService {
                 { timeout: this.COMMAND_TIMEOUT }
             );
 
-            const formats = ConverterUtils.parseFormatOutput(stdout);
-            this.logger.info(`[YtdlpService] Successfully parsed ${formats.length} formats`);
+            let { videoFormats, audioFormats } = ConverterUtils.parseFormatOutput(stdout);
+            const supportedTypes = ConverterUtils.getSupportedTypes(videoFormats, audioFormats);
+            this.logger.info(`[YtdlpService] Successfully parsed ${videoFormats.length} video formats and ${audioFormats.length} audio formats`);
 
-            return formats;
+            return { videoFormats, audioFormats, supportedTypes };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.logger.error(`[YtdlpService] Error fetching formats: ${errorMessage}`);
@@ -61,32 +62,31 @@ export class YtdlpService {
    * Executes yt-dlp -g command to get the direct download URL
    * 
    * @param url - YouTube video URL
-   * @param formatId - Format ID to download
+   * @param formats - Array of formats to get url to download
    * @returns Promise resolving to the direct download URL string
    * @throws Error if command execution fails
    */
-    async getDownloadUrl(url: string, formatId: string): Promise<string> {
+    async getDownloadUrl(url: string, formats: Array<string>): Promise<Array<DownloadURL>> {
         try {
             this.logger.info(
-                `[YtdlpService] Fetching download URL for format ${formatId} from URL: ${url}`
+                `[YtdlpService] Fetching download URL for formats ${formats} from URL: ${url}`
             );
 
             const { stdout } = await execPromise(
-                `${this.YTDLP_PATH} ${this.options.GET_DOWNLOAD_URL} ${this.options.FORMAT_SELECTION} "${formatId}" "${url}"`,
+                `${this.YTDLP_PATH} ${this.options.GET_DOWNLOAD_URL} ${this.options.FORMAT_SELECTION} "${formats.join('+')}" "${url}"`,
                 { timeout: this.COMMAND_TIMEOUT }
             );
 
-            const downloadUrl = stdout.trim().split('\n')[0];
-
-            if (!downloadUrl) {
+            const downloadUrlList = stdout.trim().split('\n').map(url => this.formatDownloadUrl(url));
+            if (!downloadUrlList || downloadUrlList.length === 0) {
                 throw new Error('No download URL found in response');
             }
 
             this.logger.info(
-                `[YtdlpService] Successfully retrieved download URL for format ${formatId}`
+                `[YtdlpService] Successfully retrieved download URL for format ${formats}`
             );
 
-            return downloadUrl;
+            return downloadUrlList;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.logger.error(
@@ -94,5 +94,21 @@ export class YtdlpService {
             );
             throw new Error(`Failed to fetch download URL: ${errorMessage}`);
         }
+    }
+
+    private formatDownloadUrl(url: string): DownloadURL {
+        const oUrl = new URL(url);
+        const searchParams = oUrl.searchParams;
+
+        const mime = searchParams.get('mime') as string;
+        const type = mime.split('/')[0];
+        const format = mime.split('/')[1];
+        return {
+            formatNumber: Number(searchParams.get('itag') as string),
+            fileFormat: format as FileFormats,
+            downloadUrl: url,
+            type: type as DownloadURLType,
+            expire: Number(searchParams.get('expire') as string)
+        } as DownloadURL;
     }
 }

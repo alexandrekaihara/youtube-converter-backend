@@ -6,12 +6,14 @@
 
 import type { Request, Response } from 'express';
 import type { ConverterService } from '../interfaces/converter.interface.js';
+import { AdService } from '../services/adService.service.js';
 
 /**
 * Controller class for handling converter-related HTTP requests
 */
 export class ConverterController {
     private converterService: ConverterService;
+    private adService: AdService;
     private logger: Console;
 
     /**
@@ -20,9 +22,10 @@ export class ConverterController {
     * @param converterService - The converter service instance
     * @param logger - Logger instance for debugging
     */
-    constructor(converterService: ConverterService, logger: Console = console) {
+    constructor(converterService: ConverterService, adService: AdService, logger: Console = console) {
         this.converterService = converterService;
-         this.logger = logger;
+        this.adService = adService;
+        this.logger = logger;
     }
 
     /**
@@ -48,6 +51,7 @@ export class ConverterController {
             }
 
             const response = await this.converterService.getFormats(url as string);
+            this.adService.requiredAdFormats(response.formats.videoFormats, response.formats.audioFormats);
 
             this.logger.info('[ConverterController] Successfully retrieved formats');
             res.status(200).json(response);
@@ -68,7 +72,7 @@ export class ConverterController {
     }
 
     /**
-    * GET /api/converter/download/:formatId
+    * GET /api/converter/download
     * 
     * Retrieves the direct download URL for a specific format
     * 
@@ -78,11 +82,9 @@ export class ConverterController {
     */
     async getDownloadUrl(req: Request, res: Response): Promise<void> {
         try {
-            const { url } = req.query;
-            const { formatId } = req.params;
-
+            const { url, formats } = req.query;
             this.logger.info(
-                `[ConverterController] GET /api/converter/download/${formatId} - URL: ${url}`
+                `[ConverterController] GET /api/converter/download - URL: ${url} - formats: ${formats}`
             );
 
             // Validate required parameters
@@ -94,19 +96,21 @@ export class ConverterController {
                 return;
             }
 
-            if (!formatId) {
-                this.logger.warn('[ConverterController] Missing required formatId parameter');
-                res.status(400).json({
-                    error: 'Missing required parameter: formatId',
-                });
-                return;
+            if (typeof formats === 'string') {
+                const formatsList = formats.split(',');
+                if (formatsList.length === 0 || formatsList.some(format => Number.isNaN(format))) {
+                    this.logger.warn('[ConverterController] Formats parameter passed but it is empty or some format is not a number');
+                    res.status(400).json({
+                        error: 'Formats parameter passed but it is empty or some format is not a number',
+                    });
+                    return;
+                }
             }
 
             const urlStr = typeof url === 'string' ? url : (Array.isArray(url) ? url[0] : '');
-            const formatIdStr = Array.isArray(formatId) ? formatId[0] : formatId;
             const response = await this.converterService.getDownloadUrl(
                 urlStr as string,
-                formatIdStr as string
+                (formats as string).split(',') as Array<string>
             );
 
             this.logger.info('[ConverterController] Successfully retrieved download URL');

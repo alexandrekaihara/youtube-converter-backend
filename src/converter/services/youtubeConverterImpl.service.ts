@@ -5,7 +5,7 @@
  */
 
 import { YtdlpService } from './ytdlp.service.js';
-import { ConverterService, type DownloadUrlResponse, type VideoMetadataResponse } from '../interfaces/converter.interface.js';
+import { ConverterService, type DownloadURL, type DownloadUrlResponse, type VideoMetadataResponse } from '../interfaces/converter.interface.js';
 import type { CacheService } from '../interfaces/cache.interface.js';
 import { ConverterUtils } from '../utils/ConverterUtils.js';
 
@@ -58,6 +58,7 @@ export class YoutubeConverterImpl extends ConverterService {
                 return cachedFormats;
             }
 
+            //{ id: '360p', label: '360p', description: 'Standard', size: '~15 MB', requiresAd: false },
             const formats = await this.ytdlpService.getFormatOptions(url);
 
             const response: VideoMetadataResponse = {
@@ -66,10 +67,10 @@ export class YoutubeConverterImpl extends ConverterService {
                 timestamp: new Date(),
             };
 
-            await this.cache.set<VideoMetadataResponse>(cacheKey, response, YoutubeConverterImpl.FORMAT_CACHE_TTL);
+            this.cache.set<VideoMetadataResponse>(cacheKey, response, YoutubeConverterImpl.FORMAT_CACHE_TTL);
 
             this.logger.info(
-                `[YoutubeConverterImpl] Successfully retrieved ${formats.length} formats for video ${videoId}`
+                `[YoutubeConverterImpl] Successfully retrieved ${formats.audioFormats.length} audio formats and ${formats.videoFormats.length} video formats for video ${videoId}`
             );
 
             return response;
@@ -88,32 +89,63 @@ export class YoutubeConverterImpl extends ConverterService {
    * @returns IDownloadUrlResponse with download URL
    * @throws Error if URL/format is invalid or yt-dlp execution fails
    */
-    async getDownloadUrl(url: string, formatId: string): Promise<DownloadUrlResponse> {
+    async getDownloadUrl(url: string, formats: Array<string>): Promise<DownloadUrlResponse> {
         try {
             this.logger.info(
-                `[YoutubeConverterImpl] Getting download URL for format ${formatId} from URL: ${url}`
+                `[YoutubeConverterImpl] Getting download URL for format ${formats} from URL: ${url}`
             );
 
             ConverterUtils.validateUrl(url);
-            if (!formatId || typeof formatId !== 'string') {
-                throw new Error('Invalid format ID provided');
-            }
 
             const videoId = ConverterUtils.extractVideoId(url);
             if (!videoId) {
                 throw new Error('Could not extract valid video ID from URL');
             }
-
-            const downloadUrl = await this.ytdlpService.getDownloadUrl(url, formatId);
-
-            const response: DownloadUrlResponse = { videoId, formatId, downloadUrl, timestamp: new Date() };
             
-            this.logger.info( `[YoutubeConverterImpl] Successfully retrieved download URL for format ${formatId}`);
+            const response: DownloadUrlResponse = { videoId, timestamp: new Date(), downloadUrls: [] } as DownloadUrlResponse;
+            const remaningFormats: Array<string> = [];
+            for (let i=0; i<formats.length; i++) {
+                const format = formats[i] as string;
+                const cachedDownloadURL = await this.cache.get<DownloadURL>(this.getDownloadUrlKey(videoId, format));
+                if (cachedDownloadURL) {
+                    this.logger.info(`[YoutubeConverterImpl] Cache hit for formats of video ${videoId}`);
+                    response.downloadUrls.push(cachedDownloadURL);
+                } else {
+                    remaningFormats.push(format);
+                }
+            }
+
+            if (remaningFormats.length > 0) {
+                const downloadUrls = await this.ytdlpService.getDownloadUrl(url, remaningFormats);
+                downloadUrls.forEach(downloadUrl => {
+                    response.downloadUrls.push(downloadUrl);
+                    this.cache.set<DownloadURL>(
+                        this.getDownloadUrlKey(videoId, downloadUrl.formatNumber.toString()),
+                        downloadUrl,
+                        this.getDownloadUrlTTL(downloadUrl.expire)
+                    );
+                });
+            }
+            
+            this.logger.info( `[YoutubeConverterImpl] Successfully retrieved download URL for formats ${formats}`);
             return response;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.logger.error(`[YoutubeConverterImpl] Error getting download URL: ${errorMessage}`);
             throw error;
         }
+    }
+
+    /**
+     * Get connection status
+     *
+     * @returns boolean indicating if connected
+     */
+    private getDownloadUrlKey(videoId: string, format: string) {
+        return `downloadUrl:${videoId}:${format}`;
+    }
+
+    private getDownloadUrlTTL(timestamp: number) {
+        return timestamp - Math.floor(Date.now() / 1000);;
     }
 }

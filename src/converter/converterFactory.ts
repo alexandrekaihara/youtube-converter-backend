@@ -4,6 +4,7 @@ import { YtdlpService } from "./services/ytdlp.service.js";
 import { env } from '../config/env.js';
 import { RedisConvertService } from "./services/redisConvert.service.js";
 import { ConverterController } from "./controllers/converter.controller.js";
+import { AdService } from "./services/adService.service.js";
 
 export class ConverterFactory {
     constructor() {
@@ -15,7 +16,8 @@ export class ConverterFactory {
         const ytdlpService = this.createYtdlpService(logger);
         const redisConverterService = this.createRedisConvertService(logger);
         const youtubeConverterService = this.createConverterService(ytdlpService, redisConverterService, logger);
-        return new ConverterController(youtubeConverterService, logger);
+        const adService = new AdService();
+        return new ConverterController(youtubeConverterService, adService, logger);
     }
 
     static createConverterService(ytdlpService: YtdlpService, cacheService: CacheService, logger: Console) {
